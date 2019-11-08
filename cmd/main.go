@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"strings"
@@ -34,9 +35,12 @@ var needUpgrade string
 
 const host = "https://studygolang.com"
 
+var currentDir string
+
 func init() {
 	ARCH = make(map[string]string)
 	ARCH["amd64"] = "x86-64"
+	currentDir, _ = os.Getwd()
 }
 
 func main() {
@@ -48,25 +52,39 @@ func main() {
 		return
 	}
 	fmt.Println("开始升级")
-	filepath := download(latestVersion)
-	fmt.Println(filepath)
+	download(latestVersion)
+	upgrade()
+}
+
+func upgrade() {
+	latestGOPath := path.Join(currentDir, "go")
+	goRoot := runtime.GOROOT()
+	// mv by file name
+	dir, _ := path.Split(goRoot)
+	cmd := exec.Command("rm", "-rf", goRoot)
+	err := cmd.Run()
+	lib.HandleErr(err)
+	cmd = exec.Command("mv", latestGOPath, dir)
+	err = cmd.Run()
+	lib.HandleErr(err)
 }
 
 // 下载最新的安装包
-func download(latestVersion GOVersion) (filepath string) {
+func download(latestVersion GOVersion) {
 	dirname := "upgrade"
 	detail := latestVersion.Detail[0]
 	downloadURL := host + detail.Href
-	dir, err := os.Getwd()
-	err = os.Mkdir(path.Join(dir, dirname), 0777)
+	err := os.Mkdir(path.Join(currentDir, dirname), 0777)
 	lib.HandleErr(err)
-	filepath = path.Join(dir, dirname, detail.FileName)
+	filepath := path.Join(currentDir, dirname, detail.FileName)
 	lib.HandleErr(err)
 	s := spinner.New(spinner.CharSets[36], 1000*time.Millisecond) // Build our new spinner
 	s.Start()
 	lib.DownloadFromUrl(downloadURL, filepath)
+	cmd := exec.Command("tar", "-zxvf", filepath)
+	err = cmd.Run()
+	lib.HandleErr(err)
 	s.Stop()
-	return
 }
 
 // 检查是否需要升级
@@ -76,7 +94,7 @@ func checkIfCanUpgrade(latestVersion GOVersion) bool {
 	canUpgrade, err := lib.GOVersionCompare(latestVersionNumber, currentVersionNumber)
 	lib.HandleErr(err)
 	if !canUpgrade {
-		log.Fatalf("当前安装版本为%s, 目前最新版本为%s --无法升级\n", currentVersionNumber, latestVersionNumber)
+		log.Fatalf("当前安装版本为%s, 目前最新版本为%s --无需升级\n", currentVersionNumber, latestVersionNumber)
 	}
 	fmt.Printf("当前版本为%s, 可升级到%s\n", currentVersionNumber, latestVersionNumber)
 	for {

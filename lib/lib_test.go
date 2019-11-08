@@ -2,10 +2,8 @@ package lib
 
 import (
 	"fmt"
-	"github.com/briandowns/spinner"
 	"log"
 	"testing"
-	"time"
 )
 
 func TestGOVersionCompare(t *testing.T) {
